@@ -1,6 +1,7 @@
 from urllib2 import urlopen
 from time import time
 import xml.etree.ElementTree as ET
+
 from Cryptodome.PublicKey import RSA
 from Cryptodome.Hash import SHA256
 from Cryptodome.Signature import pkcs1_15
@@ -17,12 +18,14 @@ def check_signature():
     tree = ET.parse(xmldata)
     root = tree.getroot()
     message = root.find('beacon:outputValue', ns)
-    signature = root.find('beacon:signature', ns)
+    signature = root.find('beacon:signatureValue', ns)
 
     with open(BEACON_CERT, 'r') as f:
         key = RSA.importKey(f.read())
+    print key
     h = SHA256.new(message)
     try:
+        #TODO signature check does not work
         pkcs1_15.new(key).verify(h, signature)
         print "valid!"
     except(ValueError, TypeError):
@@ -34,7 +37,11 @@ check_signature()
 def get_current_record():
     #TODO: record -> outputvalue
     ts = int(time())
-    xmldata = urlopen("https://beacon.nist.gov/rest/record/%d" % ts)
+    # if the current record doesn't work, get previous #TODO is this sound?
+    try:
+        xmldata = urlopen("https://beacon.nist.gov/rest/record/%d" % ts)
+    except(urllib2.HTTPError):
+        xmldata = urlopen("https://beacon.nist.gov/rest/record/previous/%d" % ts)
     ns = {'beacon': 'http://beacon.nist.gov/record/0.1/'} # define xml namespace
     # Parse tree, get root ('record')
     tree = ET.parse(xmldata)
@@ -45,6 +52,6 @@ def get_current_record():
     return outputValue.text
 
 # Still to do:
-# Check signature
-# HTTPS
-# Get most recent signature
+# HTTPS - especially of ns
+# get beacon cert from site instead of downloading it
+# signature check does not work
